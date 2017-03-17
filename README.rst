@@ -29,7 +29,7 @@ An example of usage is in run_example.py file.
 simple_web_console
 ******************
 
-Proof of concept based on Torenado (required). If you want a Linux console available for a web page use `butterfly <https://github.com/paradoxxxzero/butterfly>`_ - It is awesome.
+Proof of concept based on Tornado (required). If you want a Linux console available for a web page use `butterfly <https://github.com/paradoxxxzero/butterfly>`_ - It is awesome.
 
 
 
