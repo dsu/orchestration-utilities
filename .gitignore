@@ -1,3 +1,10 @@
+#secific files to ignore
+orchestration/run.py
+orchestration/settings.py
+monitor/settings.py
+common/mail.py
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
