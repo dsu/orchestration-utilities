@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+   <head>
+      <title>WebSocket console</title>
+   </head>
+   <body>
+      <div class="container">
+         <h1>WebSocket console</h1>
+         <div class="row">
+            <div class="col-sm-12">
+               <div id="term1"> </div>
+            </div>
+         </div>
+         <div class="row">
+            <div class="col-sm-6" style="padding-top:20px;">
+               </hr>
+               <div class="form form-inline" id="term1-form" action="/api">
+                  <div class="form-group">
+                     <input  type = "hidden" name="id" value="term1"/>
+                     <input class="form-control input-lg" name="cmd" type="text" id="cmd" value="sleep 2 | date "/>
+                     <button class="btn btn-lg btn-primary" onclick="submitCmd($('#term1-form'));" >OK</button>
+                  </div>
+               </div>
+            </div>
+            <div class="col-sm-6">
+               <div class="pull-right">
+                  <span id="message"></span>
+               </div>
+            </div>
+         </div>
+         <div class="row">
+            <div class="col-sm-12" style="padding-top:20px;">
+               <div>
+                  <smalL>It is not terminal emulator is simply executes one command at a time. Terminal programs like TOP will not work, current directory will always reset to current working directory of the application.</small> 
+               </div>
+            </div>
+         </div>
+      </div>
+      <link href="css/bootstrap.min.css" rel="stylesheet">
+      <script type="text/javascript" src="js/jquery-3.1.1.min.js"></script>
+      <style>
+         #term1 {height: 500px; overflow: auto; background-color: black; color: white;border:1px black;}
+         #term1 pre {background-color: black; color: white; border: none;}
+      </style>
+      <script>
+         submitCmd = function(e)
+         {
+             var postData = e.find(':input').serialize();
+             var formURL = e.attr("action");
+             $.ajax(
+             {
+                 url : formURL,
+                 type: "POST",
+                 data : postData,
+                 success:function(data, textStatus, jqXHR) 
+                 {
+                     console.log(textStatus)
+                 },
+                 error: function(jqXHR, textStatus, errorThrown) 
+                 {
+                     console.log(textStatus)
+                     //if fails      
+                 }
+             });
+         };
+          
+         
+         
+         
+             var host = window.location.host;
+             var ws = new WebSocket('ws://'+host+'/ws');
+             var $message = $('#message');
+         
+             ws.onopen = function(){
+               $message.attr("class", 'label label-success');
+               $message.text('open');
+             };
+             ws.onmessage = function(ev){
+               $message.attr("class", 'label label-info');
+               $message.hide();
+               $message.fadeIn("slow");
+               $message.text('recieved message');
+         
+               var json = JSON.parse(ev.data);
+               console.log(json)
+               $('#' + json.id).hide();
+               $('#' + json.id).fadeIn("slow");
+               $('#' + json.id).html(json.value);
+         
+               var $rowid = $('#row' + json.id);
+               if(json.value > 500){
+                 $rowid.attr("class", "error");
+               }
+               else if(json.value > 200){
+                 $rowid.attr("class", "warning");
+               }
+               else{
+                 $rowid.attr("class", "");
+               }
+             };
+             ws.onclose = function(ev){
+               $message.attr("class", 'label label-important');
+               $message.text('closed');
+             };
+             ws.onerror = function(ev){
+               $message.attr("class", 'label label-warning');
+               $message.text('error occurred');
+             };
+         
+           
+      </script>
+   </body>
+</html>
