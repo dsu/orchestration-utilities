@@ -2,6 +2,13 @@ from abc import ABC, abstractmethod
 from types import *
 from timeit import default_timer as timer
 
+import time
+from watchdog.observers import Observer
+from watchdog.events import LoggingEventHandler
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+from watchdog.events import PatternMatchingEventHandler
+
 
 class Operation(ABC):
     '''Base class for a operation - a task to be done. Is should set EXIT_SUCCESS or EXIT_FAILURE as the status.
@@ -74,6 +81,18 @@ class Executor():
         self.chain = operations
         self.index = 0
 
+    def watch(self, path):
+        myHandler = MyHandler(self.all)
+        observer = Observer()
+        observer.schedule(myHandler, path, recursive=True)
+        observer.start()
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            observer.stop()
+        observer.join()
+
     def arg(self, opname, argname, value):
         changed = False
         for op in self.chain:
@@ -129,3 +148,31 @@ class Executor():
                     raise Exception("Operation has failed")
         else:
             raise Exception("There are not operations to execute")
+
+
+class MyHandler(FileSystemEventHandler):
+    patterns = ["*"]
+
+    def __init__(self, onModify = None):
+        self.onModify = onModify
+
+    def process(self, event):
+        """
+        event.event_type 
+            'modified' | 'created' | 'moved' | 'deleted'
+        event.is_directory
+            True | False
+        event.src_path
+            path/to/observed/file
+        """
+        # the file will be processed there
+        print(event.src_path, event.event_type)  # print now only for degug
+        if event.event_type in ["modified","created"]:
+            self.onModify()
+
+
+    def on_modified(self, event):
+        self.process(event)
+
+    def on_created(self, event):
+        self.process(event)

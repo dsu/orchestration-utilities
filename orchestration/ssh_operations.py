@@ -1,5 +1,6 @@
 import os
 import time
+import re
 import paramiko
 from paramiko import SSHClient
 from scp import SCPClient
@@ -7,9 +8,11 @@ import urllib.request
 from common.operations import Operation
 
 
+# pip install paramiko
+# pip install scp
+
 class SSHOperation(Operation):
     '''Base class for common ssh procedures'''
-
     def __init__(self, args={}):
         self.args = args
         self.scp = None
@@ -39,6 +42,21 @@ class SSHOperation(Operation):
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         client.connect(str(server), int(port), str(user), str(password), timeout=100)
         self.ssh = client
+        if self.args.get("sudo_su") is True:
+            #doesn't work
+            print('try to login as sudo')
+            stdout, stdin, stderr = self.ssh.exec_command('echo %s | sudo -S su' % password)
+            print('try to login as sudo | ok')
+            ssh_stdin, ssh_stdout, ssh_stderr = self.ssh.exec_command('whoami')
+            channel = ssh_stdout.channel
+            print("before status")
+            status = channel.recv_exit_status()
+            print("status: " + str(status))
+            print('whoami:')
+            for line in ssh_stdout.read().splitlines():
+                print(str(line))
+                
+
 
     def cleanup(self):
         if self.scp is not (None):
@@ -49,10 +67,9 @@ class SSHOperation(Operation):
 
 
 class FreeSpace(SSHOperation):
-    """Check if there is some free space"""
-
     def execute(self):
         self._init_ssh()
+        # check free space
         sh_stdin, ssh_stdout, ssh_stderr = self.ssh.exec_command('df')
         firstLine = False;
         for line in ssh_stdout.read().splitlines():
@@ -76,7 +93,6 @@ class FreeSpace(SSHOperation):
 class Upload(SSHOperation):
     """Upload and unarchive archive to a app directory
     """
-
     def execute(self):
         """
         Parameters:
@@ -85,11 +101,12 @@ class Upload(SSHOperation):
         """
         src = self.args.get("package_archive_path")
         dest = self.args.get("app_dir")
+        isSudo = self.args.get("sudo",False);
 
         if src is None:
             raise Exception("archive path is None!")
         if dest is None:
-            raise Exception("dest path is None!")
+            raise Exception("app_dir is None!")
 
         self.log('copy {} to {}'.format(str(src), str(dest)))
         ts = str(time.time())
@@ -103,9 +120,16 @@ class Upload(SSHOperation):
         self._init_scp()
         self.scp.put(src, tmpFileName)
         # unpack
-        ssh_stdin, ssh_stdout, ssh_stderr = self.ssh.exec_command('tar -zxvf ' + tmpFileName + ' -C ' + dest)
+        cmd = 'tar -zxvf ' + tmpFileName + ' -C ' + dest
+        if isSudo:
+            password = self.args.get("pass","")
+            if not password:
+                raise Exception("password for sudo is empty!")
+            cmd = 'echo \'' + password + '\'| sudo -S ' + cmd
+        
+        ssh_stdin, ssh_stdout, ssh_stderr = self.ssh.exec_command(cmd)
         self.log(ssh_stderr)
-        self.log(tmpFileName + ' unarchived to ' + dest)
+        self.log('cmd :' + cmd)
         # TODO verify files
 
         channel = ssh_stdout.channel
@@ -114,13 +138,12 @@ class Upload(SSHOperation):
         if code == 0:
             self._status = self.EXIT_SUCCESS
         else:
-            self.log("Copy cmd exit code = {}", code)
+            self.log("Copy cmd exit code = {}",code)
             self._status = self.EXIT_FAILURE
 
 
 class Restart(SSHOperation):
     """Restart the tomcat (or other kind of process)"""
-
     def execute(self):
         """
          Parameters:
@@ -132,11 +155,22 @@ class Restart(SSHOperation):
         ps_name = self.args.get('restart_ps_name');
         run_cmd = self.args.get('restart_run_cmd');
         stop_cmd = self.args.get('restart_stop_cmd');
+        isSudo = self.args.get("sudo",False);
 
         if not run_cmd:
             raise Exception("run_cmd path is Empty!")
         if not ps_name:
             raise Exception("ps_name path is Empty!")
+
+
+
+        if isSudo:
+            password = self.args.get("pass","");
+            if not password:
+                 raise Exception("password for sudo is not specified!")
+
+            stop_cmd = 'echo \'' + password + '\'| sudo -S ' + stop_cmd
+            run_cmd = 'echo \'' + password + '\'| sudo -S ' + run_cmd   
 
         self.log("restarting {} ", ps_name)
         self._init_ssh()
@@ -199,11 +233,10 @@ class Restart(SSHOperation):
 
         self._status = self.EXIT_SUCCESS
 
-
 class UploadAndRestart(SSHOperation):
     """Uploads and restart - open only one connection"""
-
     def execute(self):
+
 
         try:
             self._init_scp()
@@ -232,7 +265,7 @@ class UploadAndRestart(SSHOperation):
             self.cleanup()
 
 
-# Utility functions
+#Utility functions
 
 def get_tomcat_pid(ssh, psname):
     """Try to get pid of a tomcat instance"""
