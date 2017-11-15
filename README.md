@@ -1,4 +1,5 @@
-Python 3.5 orchestration utilities ==============================
+Python 3.5 orchestration utilities
+==============================
 
 Tools useful when developing small or medium scale web applications.
 Specifically it is only used for Java web app running on Tomcat and
